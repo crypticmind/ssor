@@ -5,6 +5,8 @@ import crypticmind.ssor.repo.UserRepo
 import sangria.schema._
 import sangria.macros.derive._
 
+import scala.collection.immutable
+
 package object model {
 
   sealed trait Entity[T] { def value: T }
@@ -31,16 +33,18 @@ package object model {
     val transientUserType: ObjectType[Unit, User] =
       deriveObjectType[Unit, User](
         ObjectTypeDescription("A transient system user")
-      )
+      ).copy(name = "TransientUser")
+
+    def idToFieldsOf[Ctx, T](ot: ObjectType[Ctx, T]): Seq[Field[Ctx, T with Id]] =
+      ot.fields.map { field =>
+        field.copy(resolve = (c: Context[Ctx, T with Id]) => field.resolve.asInstanceOf[Context[Ctx, T with Id] => Action[Ctx, String]].apply(c))
+      }
 
     val persistentUserType: ObjectType[Unit, User with Id] =
       ObjectType(
         "User",
         "A system user",
-        fields[Unit, User with Id](
-          Field("id", StringType, resolve = _.value.id),
-          Field("name", StringType, resolve = _.value.name)
-        )
+        fields[Unit, User with Id](idToFieldsOf(transientUserType): _*)
       )
 
     val id: Argument[String] = Argument("id", StringType)
