@@ -110,16 +110,19 @@ object Server extends App {
 
   val query =
     graphql"""
-    query MyUser {
-      users {
-        name
+      query MyUser {
+        users {
+          name
+        }
       }
-    }
-  """
+    """
 
   val result = Executor.execute(schema, query, new UserRepo)
 
   val x = Await.result(result, 1.minute)
 
   println(x)
+
+
+
 }

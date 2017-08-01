@@ -1,7 +1,9 @@
 
+val scalaVersionString = "2.12.2"
+
 val commonSettings = Seq(
   organization := "crypticmind",
-  scalaVersion := "2.12.2",
+  scalaVersion := scalaVersionString,
   fork in run := true,
   cancelable in run := true,
   scalacOptions := Seq(
@@ -19,14 +21,27 @@ val commonSettings = Seq(
 
 lazy val ssor = project
   .in(file("."))
-  .aggregate(framework, `example-store`)
+  .aggregate(macros, framework, `example-store`)
   .settings(
     mainClass := None,
     publishArtifact := false
   )
 
+lazy val macros = project
+  .in(file("macros"))
+  .settings(commonSettings: _*)
+  .settings(
+    name := "ssor-framework",
+    description := "The base framework for SSoR services",
+    mainClass := None,
+    libraryDependencies := Seq(
+      "org.scala-lang"      %  "scala-compiler"       % scalaVersionString
+    )
+  )
+
 lazy val framework = project
   .in(file("framework"))
+  .dependsOn(macros)
   .settings(commonSettings: _*)
   .settings(
     name := "ssor-framework",

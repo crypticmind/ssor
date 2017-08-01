@@ -1,5 +1,6 @@
 package crypticmind.ssor
 
+import crypticmind.ssor.macros._
 import crypticmind.ssor.repo.UserRepo
 import sangria.schema._
 import sangria.macros.derive._
@@ -18,10 +19,6 @@ package object model {
 
   object graphql {
 
-    trait Id {
-      def id: String
-    }
-
     val idType: InterfaceType[Unit, Id] =
       InterfaceType(
         "Id",
@@ -37,13 +34,14 @@ package object model {
       )
 
     val persistentUserType: ObjectType[Unit, User with Id] =
-      deriveObjectType[Unit, User](
-        ObjectTypeDescription("A system user")
+      ObjectType(
+        "User",
+        "A system user",
+        fields[Unit, User with Id](
+          Field("id", StringType, resolve = _.value.id),
+          Field("name", StringType, resolve = _.value.name)
+        )
       )
-
-    val transientUser: ObjectType[Unit, Transient[User]] = transientType(userType)
-    val persistentUser: ObjectType[Unit, Persistent[User]] = persistentType(userType)
-
 
     val id: Argument[String] = Argument("id", StringType)
 
@@ -51,13 +49,13 @@ package object model {
       ObjectType(
         "query",
         fields[UserRepo, Unit](
-          Field("user", OptionType(persistentUser),
+          Field("user", OptionType(persistentUserType),
           description = Some("Returns a user with a specific id"),
           arguments = id :: Nil,
-          resolve = c => c.ctx.getById(c.arg(id))),
-          Field("users", ListType(persistentUser),
+          resolve = c => c.ctx.getById(c.arg(id)).map(pu => pu.value.withId(pu.id))),
+          Field("users", ListType(persistentUserType),
           description = Some("Returns all users"),
-          resolve = c => c.ctx.getAll)
+          resolve = c => c.ctx.getAll.map(pu => pu.value.withId(pu.id)))
         )
       )
 
