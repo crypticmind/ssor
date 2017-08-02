@@ -1,6 +1,6 @@
 package crypticmind.ssor
 
-import crypticmind.ssor.repo.UserRepo
+import crypticmind.ssor.repo.{TeamRepo, UserRepo}
 import spray.json.JsValue
 
 import scala.concurrent.Future
@@ -112,21 +112,32 @@ object Server extends App {
   import scala.concurrent.duration._
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  val query =
+  val query1 =
     graphql"""
       query MyUser {
-        users {
-          id
-          name
-        }
         user(id: "1") {
           id
           name
+          team {
+            name
+          }
         }
       }
     """
 
-  val result: Future[JsValue] = Executor.execute(schema, query, new UserRepo)
+  val query2 =
+    graphql"""
+      query MyUser {
+        users {
+          name
+          team {
+            name
+          }
+        }
+      }
+    """
+
+  val result: Future[JsValue] = Executor.execute(schema, query2, (new UserRepo, new TeamRepo))
 
   val x = Await.result(result, 1.minute)
 
