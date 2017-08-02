@@ -1,6 +1,9 @@
 package crypticmind.ssor
 
 import crypticmind.ssor.repo.UserRepo
+import spray.json.JsValue
+
+import scala.concurrent.Future
 
 //
 //import akka.actor.ActorSystem
@@ -103,6 +106,7 @@ object Server extends App {
 
   import sangria.macros._
   import sangria.execution._
+  import sangria.marshalling.sprayJson._
   import crypticmind.ssor.model.graphql._
   import scala.concurrent.Await
   import scala.concurrent.duration._
@@ -112,16 +116,21 @@ object Server extends App {
     graphql"""
       query MyUser {
         users {
+          id
+          name
+        }
+        user(id: "1") {
+          id
           name
         }
       }
     """
 
-  val result = Executor.execute(schema, query, new UserRepo)
+  val result: Future[JsValue] = Executor.execute(schema, query, new UserRepo)
 
   val x = Await.result(result, 1.minute)
 
-  println(x)
+  println(x.prettyPrint)
 
 
 

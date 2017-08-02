@@ -1,6 +1,5 @@
 package crypticmind.ssor
 
-import crypticmind.ssor.macros._
 import crypticmind.ssor.repo.UserRepo
 import sangria.schema._
 import sangria.macros.derive._
@@ -15,45 +14,58 @@ package object model {
 
   case class Persistent[T](id: String, value: T) extends Entity[T]
 
+  sealed trait Ref[T] { def value: T }
+
   case class User(name: String)
+
+  case class Team(name: String)
 
   object graphql {
 
-    val idType: InterfaceType[Unit, Id] =
-      InterfaceType(
-        "Id",
-        "An entity than can be identified",
-        fields[Unit, Id](
-          Field("id", StringType, resolve = _.value.id)
-        )
-      )
+    val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
 
-    val transientUserType: ObjectType[Unit, User] =
-      deriveObjectType[Unit, User](
-        ObjectTypeDescription("A transient system user")
-      ).copy(name = "TransientUser")
-
-    def fieldsOfPlusId[Ctx, T](ot: ObjectType[Ctx, T]): Seq[Field[Ctx, T with Id]] =
+    implicit def unwrapTransient[Ctx, T](ot: ObjectType[Ctx, T]): Seq[Field[Ctx, Transient[T]]] =
       ot.fields.map { field =>
-        field.copy(resolve = (c: Context[Ctx, T with Id]) => field.resolve.asInstanceOf[Context[Ctx, T with Id] => Action[Ctx, String]].apply(c))
+        field.copy(resolve = (c: Context[Ctx, Transient[T]]) => field.resolve.asInstanceOf[Context[Ctx, T] => Action[Ctx, String]].apply(Context[Ctx, T](
+          value = c.value.value,
+          ctx = c.ctx,
+          args = c.args,
+          schema = c.schema.asInstanceOf[Schema[Ctx, T]],
+          field = c.field.asInstanceOf[Field[Ctx, T]],
+          parentType = c.parentType,
+          marshaller = c.marshaller,
+          sourceMapper = c.sourceMapper,
+          deprecationTracker = c.deprecationTracker,
+          astFields = c.astFields,
+          path = c.path,
+          deferredResolverState = c.deferredResolverState
+        )))
       }
 
-    val persistentUserType: ObjectType[Unit, User with Id] =
-      ObjectType(
-        "User",
-        "A system user",
-        fields(fieldsOfPlusId(transientUserType): _*)
-      )
+    implicit def unwrapPersistent[Ctx, T](ot: ObjectType[Ctx, T]): Seq[Field[Ctx, Persistent[T]]] =
+      ot.fields.map { field =>
+        field.copy(resolve = (c: Context[Ctx, Persistent[T]]) => field.resolve.asInstanceOf[Context[Ctx, T] => Action[Ctx, String]].apply(Context[Ctx, T](
+          value = c.value.value,
+          ctx = c.ctx,
+          args = c.args,
+          schema = c.schema.asInstanceOf[Schema[Ctx, T]],
+          field = c.field.asInstanceOf[Field[Ctx, T]],
+          parentType = c.parentType,
+          marshaller = c.marshaller,
+          sourceMapper = c.sourceMapper,
+          deprecationTracker = c.deprecationTracker,
+          astFields = c.astFields,
+          path = c.path,
+          deferredResolverState = c.deferredResolverState
+        )))
+      } :+ Field("id", StringType, resolve = (c: Context[Ctx, Persistent[T]]) => c.value.id)
 
-    val _persistentUserType: ObjectType[Unit, Persistent[User]] =
-      ObjectType(
-        "User",
-        "A system user",
-        fields[Unit, Persistent[User]](
-          Field("id", StringType, resolve = _.value.id),
-          Field("name", StringType, resolve = _.value.value.name)
-        )
-      )
+    def objectTypesForEntity[Ctx, T](ot: ObjectType[Ctx, T]): (ObjectType[Ctx, Transient[T]], ObjectType[Ctx, Persistent[T]]) = (
+      ObjectType(s"Transient${ot.name}", s"${ot.description} (transient)", fields[Ctx, Transient[T]](unwrapTransient(ot): _*)),
+      ObjectType(s"Persistent${ot.name}", s"${ot.description} (persistent)", fields[Ctx, Persistent[T]](unwrapPersistent(ot): _*))
+    )
+
+    val (transientUserType, persistentUserType) = objectTypesForEntity(userType)
 
     val id: Argument[String] = Argument("id", StringType)
 
@@ -61,11 +73,11 @@ package object model {
       ObjectType(
         "query",
         fields[UserRepo, Unit](
-          Field("user", OptionType(_persistentUserType),
+          Field("user", OptionType(persistentUserType),
           description = Some("Returns a user with a specific id"),
           arguments = id :: Nil,
           resolve = c => c.ctx.getById(c.arg(id))),
-          Field("users", ListType(_persistentUserType),
+          Field("users", ListType(persistentUserType),
           description = Some("Returns all users"),
           resolve = c => c.ctx.getAll)
         )
