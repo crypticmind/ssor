@@ -5,8 +5,6 @@ import crypticmind.ssor.repo.UserRepo
 import sangria.schema._
 import sangria.macros.derive._
 
-import scala.collection.immutable
-
 package object model {
 
   sealed trait Entity[T] { def value: T }
@@ -35,7 +33,7 @@ package object model {
         ObjectTypeDescription("A transient system user")
       ).copy(name = "TransientUser")
 
-    def idToFieldsOf[Ctx, T](ot: ObjectType[Ctx, T]): Seq[Field[Ctx, T with Id]] =
+    def fieldsOfPlusId[Ctx, T](ot: ObjectType[Ctx, T]): Seq[Field[Ctx, T with Id]] =
       ot.fields.map { field =>
         field.copy(resolve = (c: Context[Ctx, T with Id]) => field.resolve.asInstanceOf[Context[Ctx, T with Id] => Action[Ctx, String]].apply(c))
       }
@@ -44,7 +42,17 @@ package object model {
       ObjectType(
         "User",
         "A system user",
-        fields[Unit, User with Id](idToFieldsOf(transientUserType): _*)
+        fields(fieldsOfPlusId(transientUserType): _*)
+      )
+
+    val _persistentUserType: ObjectType[Unit, Persistent[User]] =
+      ObjectType(
+        "User",
+        "A system user",
+        fields[Unit, Persistent[User]](
+          Field("id", StringType, resolve = _.value.id),
+          Field("name", StringType, resolve = _.value.value.name)
+        )
       )
 
     val id: Argument[String] = Argument("id", StringType)
@@ -53,13 +61,13 @@ package object model {
       ObjectType(
         "query",
         fields[UserRepo, Unit](
-          Field("user", OptionType(persistentUserType),
+          Field("user", OptionType(_persistentUserType),
           description = Some("Returns a user with a specific id"),
           arguments = id :: Nil,
-          resolve = c => c.ctx.getById(c.arg(id)).map(pu => pu.value.withId(pu.id))),
-          Field("users", ListType(persistentUserType),
+          resolve = c => c.ctx.getById(c.arg(id))),
+          Field("users", ListType(_persistentUserType),
           description = Some("Returns all users"),
-          resolve = c => c.ctx.getAll.map(pu => pu.value.withId(pu.id)))
+          resolve = c => c.ctx.getAll)
         )
       )
 
