@@ -1,5 +1,6 @@
 package crypticmind.ssor
 
+import crypticmind.ssor.model.API
 import crypticmind.ssor.repo.{TeamRepo, UserRepo}
 import spray.json.JsValue
 
@@ -107,15 +108,15 @@ object Server extends App {
   import sangria.macros._
   import sangria.execution._
   import sangria.marshalling.sprayJson._
-  import crypticmind.ssor.model.graphql._
   import scala.concurrent.Await
   import scala.concurrent.duration._
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  val query1 =
+  val query =
     graphql"""
       query MyUser {
-        user(id: "1") {
+        # user(id: "1") {
+        users {
           id
           name
           team {
@@ -125,19 +126,9 @@ object Server extends App {
       }
     """
 
-  val query2 =
-    graphql"""
-      query MyUser {
-        users {
-          name
-          team {
-            name
-          }
-        }
-      }
-    """
+  val api: API = new API(new UserRepo, new TeamRepo)
 
-  val result: Future[JsValue] = Executor.execute(schema, query2, (new UserRepo, new TeamRepo))
+  val result: Future[JsValue] = Executor.execute(api.schema, query)
 
   val x = Await.result(result, 1.minute)
 

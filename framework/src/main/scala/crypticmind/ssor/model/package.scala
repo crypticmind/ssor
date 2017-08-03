@@ -37,7 +37,9 @@ package object model {
 
   case class Team(name: String)
 
-  object graphql {
+  class API(userRepo: UserRepo, teamRepo: TeamRepo) {
+
+    private class Ctx(val userRepo: UserRepo, val teamRepo: TeamRepo)
 
     implicit def ref[Ctx, T](retrieve: Ref[T] => T)(implicit ot: ObjectType[Ctx, T]): ObjectType[Ctx, Ref[T]] =
       ObjectType(
@@ -107,8 +109,6 @@ package object model {
 
     implicit val teamType: ObjectType[Unit, Team] = deriveObjectType[Unit, Team](ObjectTypeDescription("A team"))
 
-    val teamRepo = new TeamRepo
-
     implicit val refTeam: ObjectType[Unit, Ref[Team]] = ref[Unit, Team](rt => teamRepo.getById(rt.id).map(_.value).get)
 
     implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
@@ -120,14 +120,14 @@ package object model {
     val queryType =
       ObjectType(
         "query",
-        fields[(UserRepo, TeamRepo), Unit](
+        fields[Unit, Unit](
           Field("user", OptionType(persistentUserType),
           description = Some("Returns a user with a specific id"),
           arguments = id :: Nil,
-          resolve = c => c.ctx._1.getById(c.arg(id))),
+          resolve = c => userRepo.getById(c.arg(id))),
           Field("users", ListType(persistentUserType),
           description = Some("Returns all users"),
-          resolve = c => c.ctx._1.getAll)
+          resolve = c => userRepo.getAll)
         )
       )
 
