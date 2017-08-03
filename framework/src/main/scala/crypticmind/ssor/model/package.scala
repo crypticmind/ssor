@@ -24,90 +24,49 @@ package object model {
 
   class API(userRepo: UserRepo, teamRepo: TeamRepo, departmentRepo: DepartmentRepo) {
 
-    private class Ctx(val userRepo: UserRepo, val teamRepo: TeamRepo)
+    private def adaptField[Ctx, FT, CT](f: CT => FT)(field: Field[Ctx, _]): Field[Ctx, CT] =
+      field.copy(resolve = (c: Context[Ctx, CT]) => field.resolve.asInstanceOf[Context[Ctx, FT] => Action[Ctx, _]].apply(Context[Ctx, FT](
+        value = f(c.value),
+        ctx = c.ctx,
+        args = c.args,
+        schema = c.schema.asInstanceOf[Schema[Ctx, FT]],
+        field = c.field.asInstanceOf[Field[Ctx, FT]],
+        parentType = c.parentType,
+        marshaller = c.marshaller,
+        sourceMapper = c.sourceMapper,
+        deprecationTracker = c.deprecationTracker,
+        astFields = c.astFields,
+        path = c.path,
+        deferredResolverState = c.deferredResolverState)))
 
     implicit def ref[Ctx, T](retrieve: String => Persistent[T])(implicit ot: ObjectType[Ctx, Persistent[T]]): ObjectType[Ctx, Ref[T]] =
       ObjectType(
         ot.name,
         ot.description.getOrElse(s"${ot.name} reference"),
-        unwrapRef(retrieve, ot)
-      )
+        ot.fields.toList.map(adaptField[Ctx, Persistent[T], Ref[T]](x => retrieve(x.id))))
 
-    def unwrapRef[Ctx, T](retrieve: String => Persistent[T], ot: ObjectType[Ctx, Persistent[T]]): List[Field[Ctx, Ref[T]]] = {
-      ot.fields.toList.map { field =>
-        field.copy(resolve = (c: Context[Ctx, Ref[T]]) => field.resolve.asInstanceOf[Context[Ctx, Persistent[T]] => Action[Ctx, _]].apply(Context[Ctx, Persistent[T]](
-          value = retrieve(c.value.id),
-          ctx = c.ctx,
-          args = c.args,
-          schema = c.schema.asInstanceOf[Schema[Ctx, Persistent[T]]],
-          field = c.field.asInstanceOf[Field[Ctx, Persistent[T]]],
-          parentType = c.parentType,
-          marshaller = c.marshaller,
-          sourceMapper = c.sourceMapper,
-          deprecationTracker = c.deprecationTracker,
-          astFields = c.astFields,
-          path = c.path,
-          deferredResolverState = c.deferredResolverState
-        )))
-      }
-    }
+    implicit def transientEntity[Ctx, T](implicit ot: ObjectType[Ctx, T]): ObjectType[Ctx, Transient[T]] =
+      ObjectType(
+        s"Transient${ot.name}",
+        s"${ot.description} (transient)",
+        ot.fields.toList.map(adaptField[Ctx, T, Transient[T]](_.value)))
 
-    def unwrapTransient[Ctx, T](ot: ObjectType[Ctx, T]): List[Field[Ctx, Transient[T]]] =
-      ot.fields.toList.map { field =>
-        field.copy(resolve = (c: Context[Ctx, Transient[T]]) => field.resolve.asInstanceOf[Context[Ctx, T] => Action[Ctx, _]].apply(Context[Ctx, T](
-          value = c.value.value,
-          ctx = c.ctx,
-          args = c.args,
-          schema = c.schema.asInstanceOf[Schema[Ctx, T]],
-          field = c.field.asInstanceOf[Field[Ctx, T]],
-          parentType = c.parentType,
-          marshaller = c.marshaller,
-          sourceMapper = c.sourceMapper,
-          deprecationTracker = c.deprecationTracker,
-          astFields = c.astFields,
-          path = c.path,
-          deferredResolverState = c.deferredResolverState
-        )))
-      }
-
-    implicit def unwrapPersistent[Ctx, T](ot: ObjectType[Ctx, T]): List[Field[Ctx, Persistent[T]]] =
-      ot.fields.toList.map { field =>
-        field.copy(resolve = (c: Context[Ctx, Persistent[T]]) => field.resolve.asInstanceOf[Context[Ctx, T] => Action[Ctx, String]].apply(Context[Ctx, T](
-          value = c.value.value,
-          ctx = c.ctx,
-          args = c.args,
-          schema = c.schema.asInstanceOf[Schema[Ctx, T]],
-          field = c.field.asInstanceOf[Field[Ctx, T]],
-          parentType = c.parentType,
-          marshaller = c.marshaller,
-          sourceMapper = c.sourceMapper,
-          deprecationTracker = c.deprecationTracker,
-          astFields = c.astFields,
-          path = c.path,
-          deferredResolverState = c.deferredResolverState
-        )))
-      } :+ Field("id", StringType, resolve = (c: Context[Ctx, Persistent[T]]) => c.value.id)
-
-    def objectTypesForEntity[Ctx, T](ot: ObjectType[Ctx, T]): (ObjectType[Ctx, Transient[T]], ObjectType[Ctx, Persistent[T]]) = (
-      ObjectType(s"Transient${ot.name}", s"${ot.description} (transient)", unwrapTransient(ot)),
-      ObjectType(s"Persistent${ot.name}", s"${ot.description} (persistent)", unwrapPersistent(ot))
-    )
+    implicit def persistentEntity[Ctx, T](implicit ot: ObjectType[Ctx, T]): ObjectType[Ctx, Persistent[T]] =
+      ObjectType(
+        s"Persistent${ot.name}",
+        s"${ot.description} (persistent)",
+        Field("id", StringType, resolve = (c: Context[Ctx, Persistent[T]]) => c.value.id) ::
+          ot.fields.toList.map(adaptField[Ctx, T, Persistent[T]](_.value)))
 
     implicit val departmentType: ObjectType[Unit, Department] = deriveObjectType[Unit, Department](ObjectTypeDescription("A department"))
-
-    implicit val (transientDepartmentType, persistentDepartmentType) = objectTypesForEntity(departmentType)
 
     implicit val departmentRef: ObjectType[Unit, Ref[Department]] = ref[Unit, Department]((id: String) => departmentRepo.getById(id).get)
 
     implicit val teamType: ObjectType[Unit, Team] = deriveObjectType[Unit, Team](ObjectTypeDescription("A team"))
 
-    implicit val (transientTeamType, persistentTeamType) = objectTypesForEntity(teamType)
-
     implicit val teamRef: ObjectType[Unit, Ref[Team]] = ref[Unit, Team]((id: String) => teamRepo.getById(id).get)
     
     implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
-    
-    implicit val (transientUserType, persistentUserType) = objectTypesForEntity(userType)
 
     val id: Argument[String] = Argument("id", StringType)
 
@@ -115,15 +74,13 @@ package object model {
       ObjectType(
         "query",
         fields[Unit, Unit](
-          Field("user", OptionType(persistentUserType),
+          Field("user", OptionType(persistentEntity(userType)),
           description = Some("Returns a user with a specific id"),
           arguments = id :: Nil,
           resolve = c => userRepo.getById(c.arg(id))),
-          Field("users", ListType(persistentUserType),
+          Field("users", ListType(persistentEntity(userType)),
           description = Some("Returns all users"),
-          resolve = c => userRepo.getAll)
-        )
-      )
+          resolve = c => userRepo.getAll)))
 
     val schema = Schema(queryType)
   }
