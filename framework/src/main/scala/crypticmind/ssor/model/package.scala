@@ -1,8 +1,11 @@
 package crypticmind.ssor
 
 import crypticmind.ssor.repo.{DepartmentRepo, TeamRepo, UserRepo}
+import sangria.execution.deferred.{Deferred, DeferredResolver, Fetcher}
 import sangria.schema._
 import sangria.macros.derive._
+
+import scala.concurrent.Future
 
 package object model {
 
@@ -69,6 +72,19 @@ package object model {
     implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
 
     val id: Argument[String] = Argument("id", StringType)
+
+    val users: Fetcher[Unit, Persistent[User], Persistent[User], String] =
+      Fetcher((_, ids: Seq[String]) => Future.successful(ids.map(userRepo.getById).map(_.get)))
+
+    case class DeferTeams(ids: Seq[String]) extends Deferred[List[Persistent[Team]]]
+
+    val teams: Fetcher[Unit, Persistent[Team], Persistent[Team], String] =
+      Fetcher((_, ids: Seq[String]) => Future.successful(ids.map(teamRepo.getById).map(_.get)))
+
+    val departments: Fetcher[Unit, Persistent[Department], Persistent[Department], String] =
+      Fetcher((_, ids: Seq[String]) => Future.successful(ids.map(departmentRepo.getById).map(_.get)))
+
+    val resolver: DeferredResolver[Unit] = DeferredResolver.fetchers(users, teams, departments)
 
     val queryType =
       ObjectType(
