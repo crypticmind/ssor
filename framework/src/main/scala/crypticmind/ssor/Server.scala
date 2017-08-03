@@ -121,6 +121,7 @@ object Server extends App {
           name
           team {
             name
+            description
           }
         }
       }

@@ -35,7 +35,7 @@ package object model {
 
   case class User(name: String, team: Ref[Team])
 
-  case class Team(name: String)
+  case class Team(name: String, description: String)
 
   class API(userRepo: UserRepo, teamRepo: TeamRepo) {
 

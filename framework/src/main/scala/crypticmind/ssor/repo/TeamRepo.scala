@@ -8,8 +8,10 @@ class TeamRepo {
 
   def getAll: Seq[Persistent[Team]] = teams
 
-  def getById(id: String): Option[Persistent[Team]] =
+  def getById(id: String): Option[Persistent[Team]] = {
+    println(s"${getClass.getSimpleName}.getById($id)")
     teams.find(_.id == id)
+  }
 
   def save(user: Entity[Team]): Persistent[Team] = synchronized {
     user match {
@@ -29,6 +31,6 @@ class TeamRepo {
   }
 
   private val idGen = new AtomicInteger(1)
-  private var teams: Seq[Persistent[Team]] = 1 to 4 map { i => Persistent(idGen.getAndIncrement().toString, Team(s"team$i")) }
+  private var teams: Seq[Persistent[Team]] = 1 to 4 map { i => Persistent(idGen.getAndIncrement().toString, Team(s"team-$i", s"Description of team-$i")) }
 
 }
