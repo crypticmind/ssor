@@ -15,6 +15,7 @@ package object model {
   case class Persistent[+T](id: String, value: T) extends Entity[T]
 
   sealed trait Ref[+T] {
+    def id: String
     def get: T
     def isEmpty: Boolean
     def isDefined: Boolean = !isEmpty
@@ -22,12 +23,12 @@ package object model {
     @inline final def orNull[U >: T](implicit ev: Null <:< U): U = this getOrElse ev(null)
   }
 
-  case class Found[+T](value: T) extends Ref[T] {
+  case class Found[+T](id: String, value: T) extends Ref[T] {
     def get: T = value
     val isEmpty = false
   }
 
-  case object NotAvailable extends Ref[Nothing] {
+  case class NotAvailable[+T](id: String) extends Ref[T] {
     def get = throw new NoSuchElementException
     val isEmpty = true
   }
@@ -38,17 +39,17 @@ package object model {
 
   object graphql {
 
-    implicit def ref[Ctx, T](implicit ot: ObjectType[Ctx, T], ev: Null <:< T): ObjectType[Ctx, Ref[T]] =
+    implicit def ref[Ctx, T](retrieve: Ref[T] => T)(implicit ot: ObjectType[Ctx, T]): ObjectType[Ctx, Ref[T]] =
       ObjectType(
-        s"Ref${ot.name}",
-        s"${ot.description} (reference)",
-        fields[Ctx, Ref[T]](unwrapRef(ot): _*)
+        ot.name,
+        ot.description.getOrElse(s"${ot.name} reference"),
+        unwrapRef(retrieve, ot)
       )
 
-    def unwrapRef[Ctx, T](ot: ObjectType[Ctx, T])(implicit ev: Null <:< T): Seq[Field[Ctx, Ref[T]]] =
-      ot.fields.map { field =>
+    def unwrapRef[Ctx, T](retrieve: Ref[T] => T, ot: ObjectType[Ctx, T]): List[Field[Ctx, Ref[T]]] =
+      ot.fields.toList.map { field =>
         field.copy(resolve = (c: Context[Ctx, Ref[T]]) => field.resolve.asInstanceOf[Context[Ctx, T] => Action[Ctx, _]].apply(Context[Ctx, T](
-          value = c.value.orNull,
+          value = retrieve(c.value),
           ctx = c.ctx,
           args = c.args,
           schema = c.schema.asInstanceOf[Schema[Ctx, T]],
@@ -63,8 +64,8 @@ package object model {
         )))
       }
 
-    def unwrapTransient[Ctx, T](ot: ObjectType[Ctx, T]): Seq[Field[Ctx, Transient[T]]] =
-      ot.fields.map { field =>
+    def unwrapTransient[Ctx, T](ot: ObjectType[Ctx, T]): List[Field[Ctx, Transient[T]]] =
+      ot.fields.toList.map { field =>
         field.copy(resolve = (c: Context[Ctx, Transient[T]]) => field.resolve.asInstanceOf[Context[Ctx, T] => Action[Ctx, _]].apply(Context[Ctx, T](
           value = c.value.value,
           ctx = c.ctx,
@@ -81,8 +82,8 @@ package object model {
         )))
       }
 
-    implicit def unwrapPersistent[Ctx, T](ot: ObjectType[Ctx, T]): Seq[Field[Ctx, Persistent[T]]] =
-      ot.fields.map { field =>
+    implicit def unwrapPersistent[Ctx, T](ot: ObjectType[Ctx, T]): List[Field[Ctx, Persistent[T]]] =
+      ot.fields.toList.map { field =>
         field.copy(resolve = (c: Context[Ctx, Persistent[T]]) => field.resolve.asInstanceOf[Context[Ctx, T] => Action[Ctx, String]].apply(Context[Ctx, T](
           value = c.value.value,
           ctx = c.ctx,
@@ -100,13 +101,15 @@ package object model {
       } :+ Field("id", StringType, resolve = (c: Context[Ctx, Persistent[T]]) => c.value.id)
 
     def objectTypesForEntity[Ctx, T](ot: ObjectType[Ctx, T]): (ObjectType[Ctx, Transient[T]], ObjectType[Ctx, Persistent[T]]) = (
-      ObjectType(s"Transient${ot.name}", s"${ot.description} (transient)", fields[Ctx, Transient[T]](unwrapTransient(ot): _*)),
-      ObjectType(s"Persistent${ot.name}", s"${ot.description} (persistent)", fields[Ctx, Persistent[T]](unwrapPersistent(ot): _*))
+      ObjectType(s"Transient${ot.name}", s"${ot.description} (transient)", unwrapTransient(ot)),
+      ObjectType(s"Persistent${ot.name}", s"${ot.description} (persistent)", unwrapPersistent(ot))
     )
 
     implicit val teamType: ObjectType[Unit, Team] = deriveObjectType[Unit, Team](ObjectTypeDescription("A team"))
 
-    implicit val refTeam: ObjectType[Unit, Ref[Team]] = ref[Unit, Team]
+    val teamRepo = new TeamRepo
+
+    implicit val refTeam: ObjectType[Unit, Ref[Team]] = ref[Unit, Team](rt => teamRepo.getById(rt.id).map(_.value).get)
 
     implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
     
