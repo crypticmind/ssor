@@ -29,6 +29,10 @@ class UserRepo {
   }
 
   private val idGen = new AtomicInteger(1)
-  private var users: Seq[Persistent[User]] = 1 to 4 map { i => Persistent(idGen.getAndIncrement().toString, User(s"user-$i", NotAvailable(i.toString))) }
+  private var users: Seq[Persistent[User]] = 1 to 4 map { i => 
+    Persistent(
+      idGen.getAndIncrement().toString, 
+      User(s"user-$i", Ref(i.toString))) 
+  }
 
 }

@@ -14,24 +14,7 @@ package object model {
 
   case class Persistent[+T](id: String, value: T) extends Entity[T]
 
-  sealed trait Ref[+T] {
-    def id: String
-    def get: T
-    def isEmpty: Boolean
-    def isDefined: Boolean = !isEmpty
-    @inline final def getOrElse[U >: T](default: => U): U = if (isEmpty) default else this.get
-    @inline final def orNull[U >: T](implicit ev: Null <:< U): U = this getOrElse ev(null)
-  }
-
-  case class Found[+T](id: String, value: T) extends Ref[T] {
-    def get: T = value
-    val isEmpty = false
-  }
-
-  case class NotAvailable[+T](id: String) extends Ref[T] {
-    def get = throw new NoSuchElementException
-    val isEmpty = true
-  }
+  case class Ref[+T](id: String)
 
   case class User(name: String, team: Ref[Team])
 
@@ -41,21 +24,21 @@ package object model {
 
     private class Ctx(val userRepo: UserRepo, val teamRepo: TeamRepo)
 
-    implicit def ref[Ctx, T](retrieve: Ref[T] => T)(implicit ot: ObjectType[Ctx, T]): ObjectType[Ctx, Ref[T]] =
+    implicit def ref[Ctx, T](retrieve: String => Persistent[T])(implicit ot: ObjectType[Ctx, Persistent[T]]): ObjectType[Ctx, Ref[T]] =
       ObjectType(
         ot.name,
         ot.description.getOrElse(s"${ot.name} reference"),
         unwrapRef(retrieve, ot)
       )
 
-    def unwrapRef[Ctx, T](retrieve: Ref[T] => T, ot: ObjectType[Ctx, T]): List[Field[Ctx, Ref[T]]] =
+    def unwrapRef[Ctx, T](retrieve: String => Persistent[T], ot: ObjectType[Ctx, Persistent[T]]): List[Field[Ctx, Ref[T]]] = {
       ot.fields.toList.map { field =>
-        field.copy(resolve = (c: Context[Ctx, Ref[T]]) => field.resolve.asInstanceOf[Context[Ctx, T] => Action[Ctx, _]].apply(Context[Ctx, T](
-          value = retrieve(c.value),
+        field.copy(resolve = (c: Context[Ctx, Ref[T]]) => field.resolve.asInstanceOf[Context[Ctx, Persistent[T]] => Action[Ctx, _]].apply(Context[Ctx, Persistent[T]](
+          value = retrieve(c.value.id),
           ctx = c.ctx,
           args = c.args,
-          schema = c.schema.asInstanceOf[Schema[Ctx, T]],
-          field = c.field.asInstanceOf[Field[Ctx, T]],
+          schema = c.schema.asInstanceOf[Schema[Ctx, Persistent[T]]],
+          field = c.field.asInstanceOf[Field[Ctx, Persistent[T]]],
           parentType = c.parentType,
           marshaller = c.marshaller,
           sourceMapper = c.sourceMapper,
@@ -65,6 +48,7 @@ package object model {
           deferredResolverState = c.deferredResolverState
         )))
       }
+    }
 
     def unwrapTransient[Ctx, T](ot: ObjectType[Ctx, T]): List[Field[Ctx, Transient[T]]] =
       ot.fields.toList.map { field =>
@@ -109,11 +93,13 @@ package object model {
 
     implicit val teamType: ObjectType[Unit, Team] = deriveObjectType[Unit, Team](ObjectTypeDescription("A team"))
 
-    implicit val refTeam: ObjectType[Unit, Ref[Team]] = ref[Unit, Team](rt => teamRepo.getById(rt.id).map(_.value).get)
+    implicit val (transientTeamType, persistentTeamType) = objectTypesForEntity(teamType)
 
+    implicit val teamRef: ObjectType[Unit, Ref[Team]] = ref[Unit, Team]((id: String) => teamRepo.getById(id).get)
+    
     implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
     
-    val (transientUserType, persistentUserType) = objectTypesForEntity(userType)
+    implicit val (transientUserType, persistentUserType) = objectTypesForEntity(userType)
 
     val id: Argument[String] = Argument("id", StringType)
 
