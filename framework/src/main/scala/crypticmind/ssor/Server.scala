@@ -1,7 +1,7 @@
 package crypticmind.ssor
 
 import crypticmind.ssor.model.API
-import crypticmind.ssor.repo.{TeamRepo, UserRepo}
+import crypticmind.ssor.repo.{DepartmentRepo, TeamRepo, UserRepo}
 import spray.json.JsValue
 
 import scala.concurrent.Future
@@ -122,12 +122,15 @@ object Server extends App {
           team {
             name
             description
+            department {
+              name
+            }
           }
         }
       }
     """
 
-  val api: API = new API(new UserRepo, new TeamRepo)
+  val api: API = new API(new UserRepo, new TeamRepo, new DepartmentRepo)
 
   val result: Future[JsValue] = Executor.execute(api.schema, query)
 

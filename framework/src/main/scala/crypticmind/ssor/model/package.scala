@@ -1,6 +1,6 @@
 package crypticmind.ssor
 
-import crypticmind.ssor.repo.{TeamRepo, UserRepo}
+import crypticmind.ssor.repo.{DepartmentRepo, TeamRepo, UserRepo}
 import sangria.schema._
 import sangria.macros.derive._
 
@@ -18,9 +18,11 @@ package object model {
 
   case class User(name: String, team: Ref[Team])
 
-  case class Team(name: String, description: String)
+  case class Team(name: String, description: String, department: Option[Ref[Department]])
 
-  class API(userRepo: UserRepo, teamRepo: TeamRepo) {
+  case class Department(name: String)
+
+  class API(userRepo: UserRepo, teamRepo: TeamRepo, departmentRepo: DepartmentRepo) {
 
     private class Ctx(val userRepo: UserRepo, val teamRepo: TeamRepo)
 
@@ -90,6 +92,12 @@ package object model {
       ObjectType(s"Transient${ot.name}", s"${ot.description} (transient)", unwrapTransient(ot)),
       ObjectType(s"Persistent${ot.name}", s"${ot.description} (persistent)", unwrapPersistent(ot))
     )
+
+    implicit val departmentType: ObjectType[Unit, Department] = deriveObjectType[Unit, Department](ObjectTypeDescription("A department"))
+
+    implicit val (transientDepartmentType, persistentDepartmentType) = objectTypesForEntity(departmentType)
+
+    implicit val departmentRef: ObjectType[Unit, Ref[Department]] = ref[Unit, Department]((id: String) => departmentRepo.getById(id).get)
 
     implicit val teamType: ObjectType[Unit, Team] = deriveObjectType[Unit, Team](ObjectTypeDescription("A team"))
 
