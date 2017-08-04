@@ -9,19 +9,25 @@ import scala.concurrent.Future
 
 package object model {
 
+  case class Ref[+T](id: String)
+
+  sealed trait Reference[+T] {
+    def id: String
+  }
+
+  case class JustId[+T](id: String) extends Reference[T]
+
   sealed trait Entity[+T] { def value: T }
 
   case class Transient[+T](value: T) extends Entity[T] {
     def withId(id: String): Persistent[T] = Persistent(id, value)
   }
 
-  case class Persistent[+T](id: String, value: T) extends Entity[T]
+  case class Persistent[+T](id: String, value: T) extends Entity[T] with Reference[T]
 
-  case class Ref[+T](id: String)
+  case class User(name: String, team: Reference[Team])
 
-  case class User(name: String, team: Ref[Team])
-
-  case class Team(name: String, description: String, department: Option[Ref[Department]])
+  case class Team(name: String)
 
   case class Department(name: String)
 
@@ -48,6 +54,20 @@ package object model {
         ot.description.getOrElse(s"${ot.name} reference"),
         ot.fields.toList.map(adaptField[Ctx, Persistent[T], Ref[T]](x => retrieve(x.id))))
 
+    implicit def reference[Ctx, T](retrieve: String => Persistent[T])(implicit ot: ObjectType[Ctx, Persistent[T]]): UnionType[Ctx] = {
+
+      val r: ObjectType[Ctx, Reference[T]] =
+        ObjectType(
+          "Reference",
+          Some("Reference"),
+          fields[Ctx, Reference[T]](Field("id", StringType, resolve = _.value.id)))
+      
+      UnionType(
+        ot.name,
+        ot.description.map(_ + " reference"),
+        List(ot, r))
+    }
+
     implicit def transientEntity[Ctx, T](implicit ot: ObjectType[Ctx, T]): ObjectType[Ctx, Transient[T]] =
       ObjectType(
         s"Transient${ot.name}",
@@ -67,24 +87,25 @@ package object model {
 
     implicit val teamType: ObjectType[Unit, Team] = deriveObjectType[Unit, Team](ObjectTypeDescription("A team"))
 
-    implicit val teamRef: ObjectType[Unit, Ref[Team]] = ref[Unit, Team]((id: String) => teamRepo.getById(id).get)
-    
+    //implicit val teamRef: ObjectType[Unit, Ref[Team]] = ref[Unit, Team]((id: String) => teamRepo.getById(id).get)
+    implicit val teamReference: ObjectType[Unit, Reference[Team]] = reference[Unit, Team]((id: String) => teamRepo.getById(id).get)
+
     implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
 
     val id: Argument[String] = Argument("id", StringType)
 
-    val users: Fetcher[Unit, Persistent[User], Persistent[User], String] =
-      Fetcher((_, ids: Seq[String]) => Future.successful(ids.map(userRepo.getById).map(_.get)))
-
-    case class DeferTeams(ids: Seq[String]) extends Deferred[List[Persistent[Team]]]
-
-    val teams: Fetcher[Unit, Persistent[Team], Persistent[Team], String] =
-      Fetcher((_, ids: Seq[String]) => Future.successful(ids.map(teamRepo.getById).map(_.get)))
-
-    val departments: Fetcher[Unit, Persistent[Department], Persistent[Department], String] =
-      Fetcher((_, ids: Seq[String]) => Future.successful(ids.map(departmentRepo.getById).map(_.get)))
-
-    val resolver: DeferredResolver[Unit] = DeferredResolver.fetchers(users, teams, departments)
+//    val users: Fetcher[Unit, Persistent[User], Persistent[User], String] =
+//      Fetcher((_, ids: Seq[String]) => Future.successful(ids.map(userRepo.getById).map(_.get)))
+//
+//    case class DeferTeams(ids: Seq[String]) extends Deferred[List[Persistent[Team]]]
+//
+//    val teams: Fetcher[Unit, Persistent[Team], Persistent[Team], String] =
+//      Fetcher((_, ids: Seq[String]) => Future.successful(ids.map(teamRepo.getById).map(_.get)))
+//
+//    val departments: Fetcher[Unit, Persistent[Department], Persistent[Department], String] =
+//      Fetcher((_, ids: Seq[String]) => Future.successful(ids.map(departmentRepo.getById).map(_.get)))
+//
+//    val resolver: DeferredResolver[Unit] = DeferredResolver.fetchers(users, teams, departments)
 
     val queryType =
       ObjectType(

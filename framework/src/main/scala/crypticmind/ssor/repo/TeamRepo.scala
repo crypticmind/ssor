@@ -32,7 +32,7 @@ class TeamRepo {
 
   private val idGen = new AtomicInteger(1)
   private var teams: Seq[Persistent[Team]] = 1 to 4 map { i =>
-    Persistent(idGen.getAndIncrement().toString, Team(s"team-$i", s"Description of team-$i", if (i % 2 == 0) Some(Ref(i.toString)) else None))
+    Persistent(idGen.getAndIncrement().toString, Team(s"team-$i"))
   }
 
 }
