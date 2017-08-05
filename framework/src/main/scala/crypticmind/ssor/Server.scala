@@ -120,11 +120,8 @@ object Server extends App {
           id
           name
           team {
+            id
             name
-            description
-            department {
-              name
-            }
           }
         }
       }
