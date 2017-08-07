@@ -1,8 +1,11 @@
 package crypticmind.ssor
 
 import crypticmind.ssor.repo.{DepartmentRepo, TeamRepo, UserRepo}
+import sangria.execution.deferred.{Deferred, DeferredResolver, Fetcher, HasId}
 import sangria.schema._
 import sangria.macros.derive._
+
+import scala.concurrent.Future
 
 package object model {
 
@@ -20,6 +23,10 @@ package object model {
 
   case class Persistent[+T](id: String, value: T) extends Entity[T] with Ref[T]
 
+  object Persistent {
+    implicit def hasId[T]: HasId[Persistent[T], String] = HasId(_.id)
+  }
+
   case class User(name: String, team: Ref[Team])
 
   case class Team(name: String)
@@ -32,7 +39,26 @@ package object model {
 
     implicit val teamRefType: ObjectType[Unit, Ref[Team]] = ref
 
-    implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
+    //implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
+
+    val teams = Fetcher((_: Unit, ids: Seq[String]) => Future.successful(ids.map(id => teamRepo.getById(id).getOrElse(throw new Exception(s"Unresolved reference to Team with ID $id")))))
+
+    val resolver: DeferredResolver[Unit] =
+      DeferredResolver.fetchers(teams)
+
+    case class DeferTeam(id: String) extends Deferred[Persistent[Team]]
+
+    val userTeamResolve: Context[Unit, User] => Action[Unit, Ref[Team]] = c => teams.defer(c.value.team.id)
+
+    val userType: ObjectType[Unit, User] =
+      ObjectType[Unit, User](
+        "User",
+        "A system user",
+        fields[Unit, User](
+          Field("name", StringType, resolve = _.value.name),
+          Field("team", teamRefType, resolve = userTeamResolve)
+        )
+      )
 
     val id: Argument[String] = Argument("id", StringType)
 
@@ -43,10 +69,10 @@ package object model {
           Field("user", OptionType(persistentEntity(userType)),
           description = Some("Returns a user with a specific id"),
           arguments = id :: Nil,
-          resolve = c => userRepo.getById(c.arg(id)).map { case Persistent(eid, user) => Persistent(eid, user.copy(team = teamRepo.getById(user.team.id).get)) }),
+          resolve = c => userRepo.getById(c.arg(id))),
           Field("users", ListType(persistentEntity(userType)),
           description = Some("Returns all users"),
-          resolve = c => userRepo.getAll.map { case Persistent(eid, user) => Persistent(eid, user.copy(team = teamRepo.getById(user.team.id).get)) })))
+          resolve = _ => userRepo.getAll)))
 
     val schema = Schema(queryType)
 

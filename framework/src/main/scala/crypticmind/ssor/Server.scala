@@ -112,10 +112,21 @@ object Server extends App {
   import scala.concurrent.duration._
   import scala.concurrent.ExecutionContext.Implicits.global
 
+//  val query =
+//    graphql"""
+//      query MyUser {
+//        user(id: "1") {
+//          name
+//          team {
+//            name
+//          }
+//        }
+//      }
+//    """
+
   val query =
     graphql"""
       query MyUser {
-        # user(id: "1") {
         users {
           id
           name
@@ -129,7 +140,7 @@ object Server extends App {
 
   val api: API = new API(new UserRepo, new TeamRepo, new DepartmentRepo)
 
-  val result: Future[JsValue] = Executor.execute(api.schema, query)
+  val result: Future[JsValue] = Executor.execute(api.schema, query, deferredResolver = api.resolver)
 
   val x = Await.result(result, 1.minute)
 

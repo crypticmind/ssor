@@ -8,8 +8,10 @@ class UserRepo {
 
   def getAll: Seq[Persistent[User]] = users
 
-  def getById(id: String): Option[Persistent[User]] =
+  def getById(id: String): Option[Persistent[User]] = {
+    println(s"${getClass.getSimpleName}.getById($id)")
     users.find(_.id == id)
+  }
 
   def save(user: Entity[User]): Persistent[User] = synchronized {
     user match {
@@ -32,7 +34,7 @@ class UserRepo {
   private var users: Seq[Persistent[User]] = 1 to 4 map { i => 
     Persistent(
       idGen.getAndIncrement().toString, 
-      User(s"user-$i", Id(i.toString)))
+      User(s"user-$i", Id("1")))
   }
 
 }
