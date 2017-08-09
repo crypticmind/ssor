@@ -15,8 +15,8 @@ class TeamRepo {
 
   def save(user: Entity[Team]): Persistent[Team] = synchronized {
     user match {
-      case tteam @ Transient(_) =>
-        val pteam = tteam.withId(idGen.getAndIncrement().toString)
+      case Transient(team) =>
+        val pteam = Persistent(idGen.getAndIncrement().toString, team)
         teams :+= pteam
         pteam
       case pteam @ Persistent(id, _) =>

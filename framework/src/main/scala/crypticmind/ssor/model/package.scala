@@ -9,22 +9,22 @@ import scala.concurrent.Future
 
 package object model {
 
-  sealed trait Ref[+T] {
-    def id: String
+  sealed trait Ref[+T] { def id: String }
+
+  object Ref {
+    implicit def hasId[T]: HasId[Ref[T], String] = HasId(_.id)
   }
 
   case class Id[+T](id: String) extends Ref[T]
 
   sealed trait Entity[+T] { def value: T }
 
-  case class Transient[+T](value: T) extends Entity[T] {
-    def withId(id: String): Persistent[T] = Persistent(id, value)
-  }
+  case class Transient[+T](value: T) extends Entity[T]
 
   case class Persistent[+T](id: String, value: T) extends Entity[T] with Ref[T]
 
   object Persistent {
-    implicit def hasId[T]: HasId[Persistent[T], String] = HasId(_.id)
+    implicit def hasId[T]: HasId[Persistent[T], Ref[T]] = HasId(identity)
   }
 
   case class User(name: String, team: Ref[Team])
@@ -37,28 +37,19 @@ package object model {
 
     implicit val teamType: ObjectType[Unit, Team] = deriveObjectType[Unit, Team](ObjectTypeDescription("A team"))
 
-    implicit val teamRefType: ObjectType[Unit, Ref[Team]] = ref
+    case class DeferTeam(team: Ref[Team]) extends Deferred[Persistent[Team]]
 
-    //implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
+    implicit def teamRefAction(rt: Ref[Team]): LeafAction[Unit, Ref[Team]] = DeferredValue(DeferTeam(rt))
 
-    val teams = Fetcher((_: Unit, ids: Seq[String]) => Future.successful(ids.map(id => teamRepo.getById(id).getOrElse(throw new Exception(s"Unresolved reference to Team with ID $id")))))
+    implicit val refTeam: ObjectType[Unit, Ref[Team]] = ref
 
-    val resolver: DeferredResolver[Unit] =
-      DeferredResolver.fetchers(teams)
+    implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
 
-    case class DeferTeam(id: String) extends Deferred[Persistent[Team]]
+    val teams = Fetcher((_: Unit, ids: Seq[Ref[Team]]) => Future.successful(ids.map(ref => teamRepo.getById(ref.id).getOrElse(throw new Exception(s"Unresolved reference to Team with ID ${ref.id}")))))
 
-    val userTeamResolve: Context[Unit, User] => Action[Unit, Ref[Team]] = c => teams.defer(c.value.team.id)
+    val resolver: DeferredResolver[Unit] = DeferredResolver.fetchers(teams)
 
-    val userType: ObjectType[Unit, User] =
-      ObjectType[Unit, User](
-        "User",
-        "A system user",
-        fields[Unit, User](
-          Field("name", StringType, resolve = _.value.name),
-          Field("team", teamRefType, resolve = userTeamResolve)
-        )
-      )
+    val userTeamResolve: Context[Unit, User] => Action[Unit, Ref[Team]] = c => teams.defer(c.value.team)
 
     val id: Argument[String] = Argument("id", StringType)
 

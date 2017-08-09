@@ -15,8 +15,8 @@ class UserRepo {
 
   def save(user: Entity[User]): Persistent[User] = synchronized {
     user match {
-      case tuser@Transient(_) =>
-        val puser = tuser.withId(idGen.getAndIncrement().toString)
+      case Transient(user) =>
+        val puser = Persistent(idGen.getAndIncrement().toString, user)
         users :+= puser
         puser
       case puser@Persistent(id, _) =>

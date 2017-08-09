@@ -15,8 +15,8 @@ class DepartmentRepo {
 
   def save(user: Entity[Department]): Persistent[Department] = synchronized {
     user match {
-      case tdepartment @ Transient(_) =>
-        val pdepartment = tdepartment.withId(idGen.getAndIncrement().toString)
+      case Transient(department) =>
+        val pdepartment = Persistent(idGen.getAndIncrement().toString, department)
         departments :+= pdepartment
         pdepartment
       case pdepartment @ Persistent(id, _) =>
