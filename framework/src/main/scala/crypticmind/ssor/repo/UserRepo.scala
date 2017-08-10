@@ -34,7 +34,7 @@ class UserRepo {
   private var users: Seq[Persistent[User]] = 1 to 4 map { i => 
     Persistent(
       idGen.getAndIncrement().toString, 
-      User(s"user-$i", Id("1")))
+      User(s"user-$i", Id(i.toString)))
   }
 
 }

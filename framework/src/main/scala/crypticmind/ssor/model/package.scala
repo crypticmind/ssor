@@ -32,17 +32,22 @@ package object model {
 
   case class User(name: String, team: Ref[Team])
 
-  case class Team(name: String)
+  case class Team(name: String, department: Option[Ref[Department]])
 
   case class Department(name: String)
 
   class API(userRepo: UserRepo, teamRepo: TeamRepo, departmentRepo: DepartmentRepo) {
 
-    implicit val teamType: ObjectType[Unit, Team] = deriveObjectType[Unit, Team](ObjectTypeDescription("A team"))
+    implicit val departments: Fetcher[Unit, Persistent[Department], Persistent[Department], Id[Department]] =
+      Fetcher { (_, refs) =>
+        Future.successful {
+          refs.map(ref => departmentRepo.getById(ref.id).getOrElse(throw new Exception(s"Unresolved reference to Department with ID ${ref.id}")))
+        }
+      }
 
-    implicit val refTeam: ObjectType[Unit, Ref[Team]] = referenceEntity
+    implicit val departmentType: ObjectType[Unit, Department] = deriveObjectType[Unit, Department](ObjectTypeDescription("A department"))
 
-    implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
+    implicit val refDepartment: ObjectType[Unit, Ref[Department]] = referenceEntity
 
     implicit val teams: Fetcher[Unit, Persistent[Team], Persistent[Team], Id[Team]] =
       Fetcher { (_, refs) =>
@@ -51,7 +56,13 @@ package object model {
         }
       }
 
-    val resolver: DeferredResolver[Unit] = DeferredResolver.fetchers(teams)
+    implicit val teamType: ObjectType[Unit, Team] = deriveObjectType[Unit, Team](ObjectTypeDescription("A team"))
+
+    implicit val refTeam: ObjectType[Unit, Ref[Team]] = referenceEntity
+
+    implicit val userType: ObjectType[Unit, User] = deriveObjectType[Unit, User](ObjectTypeDescription("A system user"))
+
+    val resolver: DeferredResolver[Unit] = DeferredResolver.fetchers(teams, departments)
 
     val id: Argument[String] = Argument("id", StringType)
 
@@ -93,6 +104,12 @@ package object model {
     implicit def refAction[Ctx, T](ref: Ref[T])(implicit fetcher: Fetcher[Ctx, Persistent[T], Persistent[T], Id[T]]): LeafAction[Unit, Ref[T]] =
       fetcher.defer(ref)
 
+    implicit def optRefAction[Ctx, T](optRef: Option[Ref[T]])(implicit fetcher: Fetcher[Ctx, Persistent[T], Persistent[T], Id[T]]): LeafAction[Unit, Option[Ref[T]]] =
+      optRef match {
+        case Some(ref) => fetcher.deferOpt(ref)
+        case None => Value(None)
+      }
+    
     private def adaptField[Ctx, FT, CT](f: CT => FT)(field: Field[Ctx, _]): Field[Ctx, CT] =
       field.copy(resolve = (c: Context[Ctx, CT]) => field.resolve.asInstanceOf[Context[Ctx, FT] => Action[Ctx, _]].apply(Context[Ctx, FT](
         value = f(c.value),
