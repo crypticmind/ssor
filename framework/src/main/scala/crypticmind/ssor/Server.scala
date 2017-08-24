@@ -2,6 +2,7 @@ package crypticmind.ssor
 
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.Http.ServerBinding
 import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.model.StatusCode
 import akka.http.scaladsl.model.StatusCodes._
@@ -68,5 +69,12 @@ object Server extends App {
         case error: ErrorWithResolver ⇒ InternalServerError → error.resolveError
       }
 
-  Http().bindAndHandle(route, "0.0.0.0", 8080)
+  Http().bindAndHandle(route, "0.0.0.0", 8080).andThen {
+    case Success(ServerBinding(address)) =>
+      println(s"Listening on $address")
+    case Failure(ex) =>
+      System.err.println(s"Error: $ex")
+      System.exit(0)
+  }
+  
 }

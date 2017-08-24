@@ -2,6 +2,7 @@ package crypticmind.ssor
 
 import crypticmind.ssor.repo.{DepartmentRepo, TeamRepo, UserRepo}
 import sangria.execution.deferred.{DeferredResolver, Fetcher, HasId}
+import sangria.macros.derive.GraphQLField
 import sangria.schema._
 
 import scala.concurrent.Future
@@ -26,7 +27,7 @@ package object model {
   case class Persistent[+T](id: String, value: T) extends Entity[T] with Ref[T]
 
   object Persistent {
-    implicit def hasId[T]: HasId[Persistent[T], Ref[T]] = HasId(identity)
+    implicit def hasId[T]: HasId[Persistent[T], Ref[T]] = HasId(Ref.asId)
   }
 
   case class User(name: String, team: Ref[Team])
@@ -76,21 +77,47 @@ package object model {
 
     val resolver: DeferredResolver[Unit] = DeferredResolver.fetchers(teams, departments)
 
-    val id: Argument[String] = Argument("id", StringType)
+    val idArg: Argument[String] = Argument("id", StringType)
+    val nameArg: Argument[String] = Argument("name", StringType)
 
     val queryType =
       ObjectType(
-        "query",
+        "Query",
         fields[Unit, Unit](
-          Field("user", OptionType(userType),
-          description = Some("Returns a user with a specific id"),
-          arguments = id :: Nil,
-          resolve = c => userRepo.getById(c.arg(id))),
-          Field("users", ListType(userType),
-          description = Some("Returns all users"),
-          resolve = _ => userRepo.getAll)))
+          Field(
+            "user",
+            OptionType(userType),
+            description = Some("Returns a user with a specific id"),
+            arguments = idArg :: Nil,
+            resolve = c => userRepo.getById(c.arg(idArg))),
+          Field(
+            "users",
+            ListType(userType),
+            description = Some("Returns all users"),
+            resolve = _ => userRepo.getAll),
+          Field(
+            "department",
+            OptionType(departmentType),
+            description = Some("Returns a department with a specific id"),
+            arguments = idArg :: Nil,
+            resolve = c => departmentRepo.getById(c.arg(idArg))),
+          Field(
+            "departments",
+            ListType(departmentType),
+            description = Some("Returns all departments"),
+            resolve = _ => departmentRepo.getAll)))
 
-    val schema = Schema(queryType)
+    val mutationType =
+      ObjectType(
+        "Mutation",
+        fields[Unit, Unit](
+          Field(
+            "add_department",
+            departmentType,
+            arguments = nameArg :: Nil,
+            resolve = c => departmentRepo.save(Transient(Department(c.arg(nameArg)))))))
+
+    val schema = Schema(queryType, Some(mutationType))
 
   }
 
