@@ -2,7 +2,6 @@ package crypticmind.ssor
 
 import crypticmind.ssor.repo.{DepartmentRepo, TeamRepo, UserRepo}
 import sangria.execution.deferred.{DeferredResolver, Fetcher, HasId}
-import sangria.macros.derive.GraphQLField
 import sangria.schema._
 
 import scala.concurrent.Future
@@ -79,22 +78,23 @@ package object model {
 
     val idArg: Argument[String] = Argument("id", StringType)
     val nameArg: Argument[String] = Argument("name", StringType)
+    val optNameArg: Argument[Option[String]] = Argument("name", OptionInputType(StringType))
 
     val queryType =
       ObjectType(
         "Query",
         fields[Unit, Unit](
-          Field(
-            "user",
-            OptionType(userType),
-            description = Some("Returns a user with a specific id"),
-            arguments = idArg :: Nil,
-            resolve = c => userRepo.getById(c.arg(idArg))),
-          Field(
-            "users",
-            ListType(userType),
-            description = Some("Returns all users"),
-            resolve = _ => userRepo.getAll),
+//          Field(
+//            "user",
+//            OptionType(userType),
+//            description = Some("Returns a user with a specific id"),
+//            arguments = idArg :: Nil,
+//            resolve = c => userRepo.getById(c.arg(idArg))),
+//          Field(
+//            "users",
+//            ListType(userType),
+//            description = Some("Returns all users"),
+//            resolve = _ => userRepo.getAll),
           Field(
             "department",
             OptionType(departmentType),
@@ -115,10 +115,23 @@ package object model {
             "add_department",
             departmentType,
             arguments = nameArg :: Nil,
-            resolve = c => departmentRepo.save(Transient(Department(c.arg(nameArg)))))))
+            resolve = c => departmentRepo.save(Transient(Department(c.arg(nameArg))))),
+          Field(
+            "update_department",
+            OptionType(departmentType),
+            arguments = idArg :: optNameArg :: Nil,
+            resolve = { c =>
+              departmentRepo.getById(c.arg(idArg)).map { pd =>
+                departmentRepo.save(pd.copy(value = pd.value.copy(name = c.arg(optNameArg).getOrElse(pd.value.name))))
+              }
+            }),
+          Field(
+            "delete_department",
+            BooleanType,
+            arguments = idArg :: Nil,
+            resolve = c => departmentRepo.delete(c.arg(idArg)))))
 
     val schema = Schema(queryType, Some(mutationType))
 
   }
-
 }
