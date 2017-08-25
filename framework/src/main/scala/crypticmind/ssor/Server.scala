@@ -11,6 +11,7 @@ import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
 import crypticmind.ssor.api.API
 import crypticmind.ssor.repo.{DepartmentRepo, TeamRepo, UserRepo}
+import crypticmind.ssor.service.Service
 import sangria.ast
 import sangria.execution.{ErrorWithResolver, Executor, QueryAnalysisError}
 import sangria.marshalling.sprayJson._
@@ -25,7 +26,7 @@ object Server extends App {
 
   implicit val system: ActorSystem = ActorSystem("ssor")
   implicit val materializer: ActorMaterializer = ActorMaterializer()
-  val api: API = new API(new UserRepo, new TeamRepo, new DepartmentRepo)
+  val api: API = new API(new Service(new UserRepo, new TeamRepo, new DepartmentRepo))
 
   import system.dispatcher
 

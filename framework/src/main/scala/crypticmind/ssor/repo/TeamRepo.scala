@@ -26,8 +26,10 @@ class TeamRepo {
     }
   }
 
-  def delete(id: String): Unit = synchronized {
+  def delete(id: String): Boolean = synchronized {
+    val found = getById(id).isDefined
     teams = teams.filterNot(_.id == id)
+    found
   }
 
   private val idGen = new AtomicInteger(1)

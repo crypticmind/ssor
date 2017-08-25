@@ -1,7 +1,5 @@
 package crypticmind.ssor
 
-import sangria.execution.deferred.HasId
-
 package object model {
 
   sealed trait Ref[+T] { def id: String }
@@ -9,7 +7,7 @@ package object model {
   object Ref {
     implicit def asId[T](ref: Ref[T]): Id[T] = ref match {
       case id: Id[T] => id
-      case Persistent(id, _) => Id(id)
+      case other => Id(other.id)
     }
   }
 
@@ -20,10 +18,6 @@ package object model {
   case class Transient[+T](value: T) extends Entity[T]
 
   case class Persistent[+T](id: String, value: T) extends Entity[T] with Ref[T]
-
-  object Persistent {
-    implicit def hasId[T]: HasId[Persistent[T], Ref[T]] = HasId(Ref.asId)
-  }
 
   case class User(name: String, team: Ref[Team])
 

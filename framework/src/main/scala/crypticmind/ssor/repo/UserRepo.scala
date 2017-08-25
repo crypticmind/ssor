@@ -26,8 +26,10 @@ class UserRepo {
     }
   }
 
-  def delete(id: String): Unit = synchronized {
+  def delete(id: String): Boolean = synchronized {
+    val found = getById(id).isDefined
     users = users.filterNot(_.id == id)
+    found
   }
 
   private val idGen = new AtomicInteger(1)
