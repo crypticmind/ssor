@@ -21,18 +21,18 @@ val commonSettings = Seq(
 
 lazy val ssor = project
   .in(file("."))
-  .aggregate(framework, `example-store`)
+  .aggregate(backend, frontend)
   .settings(
     mainClass := None,
     publishArtifact := false
   )
 
-lazy val framework = project
-  .in(file("framework"))
+lazy val backend = project
+  .in(file("backend"))
   .settings(commonSettings: _*)
   .settings(
-    name := "ssor-framework",
-    description := "The base framework for SSoR services",
+    name := "ssor-backend",
+    description := "The application backend",
     mainClass := None,
     libraryDependencies := Seq(
       "org.sangria-graphql" %% "sangria"              % "1.2.0",
@@ -49,15 +49,14 @@ lazy val framework = project
     )
   )
 
-lazy val `example-store` = project
-  .in(file("example-store"))
-  .dependsOn(framework % "compile->compile;test->test")
+lazy val frontend = project
+  .in(file("frontend"))
+  .dependsOn(backend)
   .settings(commonSettings: _*)
   .settings(
-    name := "ssor-example-store",
-    description := "An example store using the framework",
+    name := "ssor-frontend",
+    description := "The application frontend",
     mainClass := Some("crypticmind.examplestore.Main"),
     libraryDependencies := Seq(
-
     )
   )
