@@ -9,7 +9,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import akka.stream.ActorMaterializer
-import crypticmind.ssor.model.API
+import crypticmind.ssor.api.API
 import crypticmind.ssor.repo.{DepartmentRepo, TeamRepo, UserRepo}
 import sangria.ast
 import sangria.execution.{ErrorWithResolver, Executor, QueryAnalysisError}
@@ -23,8 +23,8 @@ import scala.util.{Failure, Success}
 
 object Server extends App {
 
-  implicit val system = ActorSystem("ssor")
-  implicit val materializer = ActorMaterializer()
+  implicit val system: ActorSystem = ActorSystem("ssor")
+  implicit val materializer: ActorMaterializer = ActorMaterializer()
   val api: API = new API(new UserRepo, new TeamRepo, new DepartmentRepo)
 
   import system.dispatcher
@@ -57,16 +57,16 @@ object Server extends App {
 
     QueryParser.parse(query) match {
       case Success(queryAst) ⇒ complete(executeGraphQLQuery(queryAst, operation, vars))
-      case Failure(error) ⇒ complete(BadRequest, JsObject("error" → JsString(error.getMessage)))
+      case Failure(error) ⇒ complete(BadRequest, JsObject("error" -> JsString(error.getMessage)))
     }
   }
 
   def executeGraphQLQuery(query: ast.Document, op: Option[String], vars: JsObject): Future[(StatusCode with Product with Serializable, JsValue)] =
     Executor.execute(api.schema, query, deferredResolver = api.resolver, variables = vars, operationName = op)
-      .map(OK → _)
+      .map(OK -> _)
       .recover {
-        case error: QueryAnalysisError ⇒ BadRequest → error.resolveError
-        case error: ErrorWithResolver ⇒ InternalServerError → error.resolveError
+        case error: QueryAnalysisError ⇒ BadRequest -> error.resolveError
+        case error: ErrorWithResolver ⇒ InternalServerError -> error.resolveError
       }
 
   Http().bindAndHandle(route, "0.0.0.0", 8080).andThen {
