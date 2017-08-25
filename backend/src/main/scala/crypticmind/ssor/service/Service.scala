@@ -5,6 +5,11 @@ import crypticmind.ssor.repo._
 
 class Service(userRepo: UserRepo, teamRepo: TeamRepo, departmentRepo: DepartmentRepo) {
 
+
+  def getUsers(limit: Int, after: Option[String]): Page[Persistent[User]] =
+    ???  // <- implement this in the repo
+
+
   def getUser(id: String): Option[Persistent[User]] =
     userRepo.getById(id)
 

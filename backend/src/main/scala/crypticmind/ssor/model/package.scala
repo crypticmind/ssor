@@ -2,14 +2,9 @@ package crypticmind.ssor
 
 package object model {
 
-  sealed trait Ref[+T] { def id: String }
+  // Entity lifecycle and reference
 
-  object Ref {
-    implicit def asId[T](ref: Ref[T]): Id[T] = ref match {
-      case id: Id[T] => id
-      case other => Id(other.id)
-    }
-  }
+  sealed trait Ref[+T] { def id: String }
 
   case class Id[+T](id: String) extends Ref[T]
 
@@ -18,6 +13,14 @@ package object model {
   case class Transient[+T](value: T) extends Entity[T]
 
   case class Persistent[+T](id: String, value: T) extends Entity[T] with Ref[T]
+
+  // Pagination
+
+  case class Page[+T](total: Int, items: Seq[PageItem[T]], last: String, hasMore: Boolean)
+
+  case class PageItem[+T](item: T, position: String)
+
+  // Domain entities
 
   case class User(name: String, team: Ref[Team])
 

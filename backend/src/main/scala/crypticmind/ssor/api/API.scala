@@ -49,13 +49,39 @@ class API(service: Service) {
 
   val idArg: Argument[String] = Argument("id", StringType)
   val nameArg: Argument[String] = Argument("name", StringType)
-  val teamIdArg: Argument[String] = Argument("teamId", StringType)
-  val optDepartmentIdArg: Argument[Option[String]] = Argument("departmentId", OptionInputType(StringType))
+  val teamIdArg: Argument[String] = Argument("team_id", StringType)
+  val optDepartmentIdArg: Argument[Option[String]] = Argument("department_id", OptionInputType(StringType))
+  val limitArg: Argument[Int] = Argument("limit", IntType)
+  val afterArg: Argument[Option[String]] = Argument("after", OptionInputType(StringType))
+
+  def pageType[Ctx, T](ot: ObjectType[Ctx, T]): ObjectType[Ctx, Page[T]] =
+    ObjectType(
+      ot.name + "_Page",
+      fields[Ctx, Page[T]](
+        Field("total", IntType, resolve = c => c.value.total),
+        Field("items", ListType(pageItemType(ot)), resolve = c => c.value.items),
+      )
+    )
+
+  def pageItemType[Ctx, T](ot: ObjectType[Ctx, T]): ObjectType[Ctx, PageItem[T]] =
+    ObjectType(
+      ot.name + "_PageItem",
+      fields[Ctx, PageItem[T]](
+        Field("item", ot, resolve = c => c.value.item),
+        Field("position", StringType, resolve = c => c.value.position)
+      )
+    )
 
   val queryType =
     ObjectType(
       "Query",
       fields[Unit, Unit](
+        Field(
+          "users_p",
+          pageType(userType),
+          description = Some("Returns a user with a specific id"),
+          arguments = limitArg :: afterArg :: Nil,
+          resolve = c => service.getUsers(c.arg(limitArg), c.arg(afterArg))),
         Field(
           "user",
           OptionType(userType),
