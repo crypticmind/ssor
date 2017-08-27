@@ -6,6 +6,19 @@ import crypticmind.ssor.model._
 
 class UserRepo {
 
+  def getAll(limit: Int, after: Option[String]): Page[Persistent[User]] = {
+    val offset = after.map(PageItem.fromPosition).map(_ + 1).getOrElse(0)
+    val items =
+      users.slice(offset, offset + limit)
+        .zip(offset until (offset + limit))
+        .map { case (p, i) => PageItem(p, PageItem.toPosition(i)) }
+    Page(
+      total = users.size,
+      items = items,
+      last = PageItem.toPosition(if (users.isEmpty) -1 else users.size - 1),
+      hasMore = if (users.isEmpty) false else offset + limit <= users.size - 1)
+  }
+
   def getAll: Seq[Persistent[User]] = users
 
   def getById(id: String): Option[Persistent[User]] = {

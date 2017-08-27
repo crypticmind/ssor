@@ -7,7 +7,7 @@ class Service(userRepo: UserRepo, teamRepo: TeamRepo, departmentRepo: Department
 
 
   def getUsers(limit: Int, after: Option[String]): Page[Persistent[User]] =
-    ???  // <- implement this in the repo
+    userRepo.getAll(limit, after)
 
 
   def getUser(id: String): Option[Persistent[User]] =

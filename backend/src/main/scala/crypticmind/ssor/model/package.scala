@@ -1,5 +1,9 @@
 package crypticmind.ssor
 
+import java.util.Base64
+
+import scala.util.Try
+
 package object model {
 
   // Entity lifecycle and reference
@@ -19,6 +23,16 @@ package object model {
   case class Page[+T](total: Int, items: Seq[PageItem[T]], last: String, hasMore: Boolean)
 
   case class PageItem[+T](item: T, position: String)
+
+  object PageItem {
+
+    def toPosition(i: Int): String =
+      Base64.getEncoder.encodeToString(i.toString.getBytes)
+
+    def fromPosition(position: String): Int =
+      Try(new String(Base64.getDecoder.decode(position)).toInt).getOrElse(0)
+
+  }
 
   // Domain entities
 

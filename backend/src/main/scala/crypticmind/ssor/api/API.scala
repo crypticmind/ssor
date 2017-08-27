@@ -60,6 +60,8 @@ class API(service: Service) {
       fields[Ctx, Page[T]](
         Field("total", IntType, resolve = c => c.value.total),
         Field("items", ListType(pageItemType(ot)), resolve = c => c.value.items),
+        Field("last", StringType, resolve = c => c.value.last),
+        Field("has_more", BooleanType, resolve = c => c.value.hasMore),
       )
     )
 
@@ -77,12 +79,6 @@ class API(service: Service) {
       "Query",
       fields[Unit, Unit](
         Field(
-          "users_p",
-          pageType(userType),
-          description = Some("Returns a user with a specific id"),
-          arguments = limitArg :: afterArg :: Nil,
-          resolve = c => service.getUsers(c.arg(limitArg), c.arg(afterArg))),
-        Field(
           "user",
           OptionType(userType),
           description = Some("Returns a user with a specific id"),
@@ -90,9 +86,10 @@ class API(service: Service) {
           resolve = c => service.getUser(c.arg(idArg))),
         Field(
           "users",
-          ListType(userType),
-          description = Some("Returns all users"),
-          resolve = _ => service.getUsers),
+          pageType(userType),
+          description = Some("Returns a user with a specific id"),
+          arguments = limitArg :: afterArg :: Nil,
+          resolve = c => service.getUsers(c.arg(limitArg), c.arg(afterArg))),
         Field(
           "team",
           OptionType(teamType),
