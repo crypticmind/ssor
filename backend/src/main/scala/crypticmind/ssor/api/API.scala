@@ -87,7 +87,7 @@ class API(service: Service) {
         Field(
           "users",
           pageType(userType),
-          description = Some("Returns a user with a specific id"),
+          description = Some("Returns all users"),
           arguments = limitArg :: afterArg :: Nil,
           resolve = c => service.getUsers(c.arg(limitArg), c.arg(afterArg))),
         Field(
