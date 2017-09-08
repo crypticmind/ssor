@@ -22,3 +22,4 @@ project/plugins/project/
 .cache
 .lib/
 .idea
+frontend/elm-stuff
