@@ -40,7 +40,11 @@ object Server extends App {
           graphQLEndpoint(requestJson)
         }
       }
-    }
+    } ~
+    pathEndOrSingleSlash {
+      getFromFile("frontend/build/index.html")
+    } ~
+    getFromDirectory("frontend/build")
 
   def graphQLEndpoint(requestJson: JsValue): StandardRoute = {
     val JsObject(fields) = requestJson

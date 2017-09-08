@@ -1,26 +1,31 @@
-import Html exposing (beginnerProgram, div, button, text)
-import Html.Events exposing (onClick)
+import Html exposing (beginnerProgram, div, button, text, input)
+import Html.Attributes exposing (..)
+import Html.Events exposing (onClick, onInput)
 
 
 main =
-  beginnerProgram { model = 0, view = view, update = update }
+  beginnerProgram { model = model, view = view, update = update }
 
 
 view model =
   div []
-    [ button [ onClick Decrement ] [ text "-" ]
-    , div [] [ text (toString model) ]
-    , button [ onClick Increment ] [ text "+" ]
+    [ div [] [ text <| String.toUpper model.content ]
+    , input [ placeholder "Input text", onInput Change ] []
     ]
 
+type alias Model =
+    { content : String
+    }
 
-type Msg = Increment | Decrement
+model : Model
+model =
+    { content = ""
+    }
+
+type Msg = Change String
 
 
 update msg model =
   case msg of
-    Increment ->
-      model + 1
-
-    Decrement ->
-      model - 1
+    Change text ->
+      { model | content = text }

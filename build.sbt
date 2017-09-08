@@ -56,7 +56,7 @@ lazy val frontend = project
   .settings(
     name := "ssor-frontend",
     description := "The application frontend",
-    mainClass := Some("crypticmind.examplestore.Main"),
+    mainClass := None,
     libraryDependencies := Seq(
     )
   )
