@@ -1,31 +1,98 @@
-import Html exposing (beginnerProgram, div, button, text, input)
+-- Read more about this program in the official Elm guide:
+-- https://guide.elm-lang.org/architecture/effects/http.html
+
+import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput)
+import Html.Events exposing (..)
+import Http
+import Json.Decode as Decode
+
 
 
 main =
-  beginnerProgram { model = model, view = view, update = update }
+  Html.program
+    { init = init "cats"
+    , view = view
+    , update = update
+    , subscriptions = subscriptions
+    }
 
 
-view model =
-  div []
-    [ div [] [ text <| String.toUpper model.content ]
-    , input [ placeholder "Input text", onInput Change ] []
-    ]
+
+-- MODEL
+
 
 type alias Model =
-    { content : String
-    }
-
-model : Model
-model =
-    { content = ""
-    }
-
-type Msg = Change String
+  { topic : String
+  , gifUrl : String
+  }
 
 
+init : String -> (Model, Cmd Msg)
+init topic =
+  ( Model topic "waiting.gif"
+  , getRandomGif topic
+  )
+
+
+
+-- UPDATE
+
+
+type Msg
+  = MorePlease
+  | NewGif (Result Http.Error String)
+
+
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    Change text ->
-      { model | content = text }
+    MorePlease ->
+      (model, getRandomGif model.topic)
+
+    NewGif (Ok newUrl) ->
+      (Model model.topic newUrl, Cmd.none)
+
+    NewGif (Err _) ->
+      (model, Cmd.none)
+
+
+
+-- VIEW
+
+
+view : Model -> Html Msg
+view model =
+  div []
+    [ h2 [] [text model.topic]
+    , button [ onClick MorePlease ] [ text "More Please!" ]
+    , br [] []
+    , img [src model.gifUrl] []
+    ]
+
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+  Sub.none
+
+
+
+-- HTTP
+
+
+getRandomGif : String -> Cmd Msg
+getRandomGif topic =
+  let
+    url =
+      "https://api.giphy.com/v1/gifs/random?api_key=dc6zaTOxFJmzC&tag=" ++ topic
+  in
+    Http.send NewGif (Http.get url decodeGifUrl)
+
+
+decodeGifUrl : Decode.Decoder String
+decodeGifUrl =
+  Decode.at ["data", "image_url"] Decode.string
